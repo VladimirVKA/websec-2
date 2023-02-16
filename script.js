@@ -148,23 +148,8 @@ function getAllStops(){
         )
 }
 
-async function digestMessage(message, algo) {
-    if (algo == null) {
-        algo = "SHA-256";
-    }
-
-    const msgUint8 = new TextEncoder().encode(message);                           // encode as (utf-8) Uint8Array
-    const hashBuffer = await crypto.subtle.digest(algo, msgUint8);                // hash the message
-    const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
-     // convert bytes to hex string
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 function getInfoByStop(KS_ID) {
-    console.log(sha1(KS_ID + "just_f0r_tests"))
-    console.log(digestMessage(KS_ID + "just_f0r_tests", "SHA-1"))
-    console.log(SHA1(KS_ID + "just_f0r_tests"))
-    return fetch(`https://tosamara.ru/api/v2/xml?method=getFirstArrivalToStop&KS_ID=${KS_ID}&os=android&clientid=test&authkey=${sha1(KS_ID + "just_f0r_tests")}`)
+    return fetch(`https://tosamara.ru/api/v2/xml?method=getFirstArrivalToStop&KS_ID=${KS_ID}&os=android&clientid=test&authkey=${SHA1(KS_ID + "just_f0r_tests")}`)
         .then(
             response => response.text())
         .then(str => {
@@ -174,34 +159,21 @@ function getInfoByStop(KS_ID) {
 }
 
 function renderInfoByNextStops(hullNo) {
-    fetch(`https://tosamara.ru/api/v2/json?method=getTransportPosition&HULLNO=${hullNo}&os=android&clientid=test&authkey=${sha1(hullNo + "just_f0r_tests")}`)
-        .then(response => response.json())
-        .then(res => {
-            let listElem = document.querySelector('#favorite-list');
-            listElem.innerHTML = "<h2>Следующие остановки: </h2>";
-            if (!res) {
-                const newItem = document.createElement('div');
-                newItem.innerHTML = "<h3>Пусто</h3>";
-                listElem.appendChild(newItem);
-                return;
+    let nextStop = ""
+    fetch(`https://tosamara.ru/api/v2/xml?method=getTransportPosition&HULLNO=${hullNo}&os=android&clientid=test&authkey=${SHA1(hullNo + "just_f0r_tests")}`)
+        .then(
+            response => response.text())
+        .then(str => {
+            return new DOMParser().parseFromString(str, "application/xml");
+        })
+        .then(
+            transportPosition => {
+                Array.from(transportPosition.getElementsByTagName("stop")).forEach((stop)=>{
+                    nextStop += placemarks.get(stop.getElementsByTagName("KS_ID")[0].textContent).properties.get('balloonContentBody') + " будет через " + Math.round(stop.getElementsByTagName("time")[0].textContent / 60)+"\n"
+                })
+                alert(nextStop)
             }
-            for (let stop of res.nextStops) {
-                const newItem = document.createElement('div');
-                newItem.innerHTML = `
-                    <div class="favorite-list-item">
-                        <h5>${placemarks.get(stop.KS_ID).properties.get('balloonContentBody')}</h5>
-                        <h6>${'Будет через ' + Math.round(+stop.time / 60)}</h6>
-                    </div>
-                `;
-                listElem.appendChild(newItem);
-                newItem.addEventListener('click', () => {
-                    modal.style.display = "none";
-                    placemarks.get(stop.KS_ID).balloon.open();
-                });
-            }
-
-            modal.style.display = "block";
-        });
+        )
 }
 
 function renderFavoriteList(){
@@ -244,10 +216,3 @@ else{utftext+=String.fromCharCode((c>>12)|224);utftext+=String.fromCharCode(((c>
         for(i=60;i<=79;i++){temp=(rotate_left(A,5)+(B^C^D)+E+W[i]+0xCA62C1D6)&0x0ffffffff;E=D;D=C;C=rotate_left(B,30);B=A;A=temp;}
         H0=(H0+A)&0x0ffffffff;H1=(H1+B)&0x0ffffffff;H2=(H2+C)&0x0ffffffff;H3=(H3+D)&0x0ffffffff;H4=(H4+E)&0x0ffffffff;}
     var temp=cvt_hex(H0)+cvt_hex(H1)+cvt_hex(H2)+cvt_hex(H3)+cvt_hex(H4);return temp.toLowerCase();}
-
-async function sha1(str) {
-    const buf = Uint8Array.from(unescape(encodeURIComponent(str)), c=>c.charCodeAt(0)).buffer;
-    const digest = await crypto.subtle.digest('SHA-1', buf);
-    const raw = String.fromCharCode.apply(null, new Uint8Array(digest));
-    return raw; // base64
-}
